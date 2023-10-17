@@ -24,18 +24,9 @@
 * the license use at your own risk.
 */
 #include <Arduino.h>
-#include "fortin.h"
-#include "shell.h"
-#include "ringbuffer.h"
-#include "fortinprocessor.h"
+#include "main.h"
 
-
-// If you need to debug without a cloud connection
-// the particle can be put into an offline mode of
-// sorts using the set system mode to semi automatic
-// SYSTEM_MODE(SEMI_AUTOMATIC)
-
-SYSTEM_THREAD(ENABLED);
+#define DEBUG
 
 // Log status requests to shell.
 // this creates a lot of noise so it
@@ -47,57 +38,28 @@ SYSTEM_THREAD(ENABLED);
 // to remote starter for status update.
 #define ORS_MS_BETWEEN_STATUS_UPDATES 15000
 
-// If insufficient uarts are available monitor
-// starter rather than remotes. If in doubt
-// leave this off.
-// #define ORS_PREFER_STARTER_UART
-
 // Enable potentially dangerous commands.
 // If in doubt comment out.
 #define ORS_DANGER_ZONE
 
+#define RemoteUart    Serial1
+#define StarterUart   Serial2
+#define RemoteSerialRX  27
+#define RemoteSerialTX  26
+#define StarterSerialRX 16
+#define StarterSerialTX 17
+#define WiFi
+#define ORS_MS_BETWEEN_STATUS_PUBLISH 15000
+//#define ORS_MS_BETWEEN_STATUS_PUBLISH 600000
 
+//GPS not implemented yet
+//#define ORS_ASSET_TRACKER
 
-// Platform specific configuration
-#if (PLATFORM_ID == 6) // Photon
-    #ifdef ORS_PREFER_STARTER_UART
-        #define StarterUart Serial1
-    #else
-        #define RemoteUart Serial1
-    #endif
-    #define WiFi
-    #define ORS_MS_BETWEEN_STATUS_PUBLISH 15000
-
-#elif (PLATFORM_ID == 10) // Electron
-    #include "Serial4/Serial4.h"
-    #include "Serial5/Serial5.h"
-    #define RemoteUart Serial4
-    #define StarterUart Serial5
-    #define ORS_MS_BETWEEN_STATUS_PUBLISH 600000
-    #define ORS_ASSET_TRACKER
-#endif
 
 #ifdef ORS_ASSET_TRACKER
     #include "AssetTrackerRK.h"
 #endif
 
-enum parserSate {
-  unknown,
-  messageStarted,
-  messageEnded
-};
-
-
-struct OrsSettings
-{
-    uint8_t version;
-    uint8_t address[3];
-    bool cloneAddress:1;
-    bool blockAlarm:1;
-    bool verbose:1;
-    uint8_t reserved:5;
-    uint16_t checksum;
-};
 
 // Used to integrate with https://github.com/jmaxxz/particle-smartthings
 // or really anything where you want to be able
@@ -251,13 +213,14 @@ void setup() {
     m_last_rx[0] = 0;
     m_current[0] = 0;
     m_settings[0] = 0;
-    Particle.function("car", carCommand);
-    Particle.function("set", set);
-    Particle.variable("rx", m_last_rx, STRING);
-    Particle.variable("current", m_current, STRING);
-    Particle.variable("settings", m_current, STRING);
-    Particle.variable("devhandler", m_devhandler, STRING);
-    Particle.variable("invMsg", &m_invalid_msg_count, INT);
+    // TODO
+    //Particle.function("car", carCommand);
+    //Particle.function("set", set);
+    //Particle.variable("rx", m_last_rx, STRING);
+    //Particle.variable("current", m_current, STRING);
+    //Particle.variable("settings", m_current, STRING);
+    //Particle.variable("devhandler", m_devhandler, STRING);
+    //Particle.variable("invMsg", &m_invalid_msg_count, INT);
     Serial.begin(115200);
 
     #ifdef RemoteUart
@@ -353,7 +316,7 @@ void printMessage(String format, uint8_t message[], int messageLength){
     }
     messageAsHex[messageLength*3] = 0;
     char strBuffer[messageSizeAsHex+format.length()+10];
-    snprintf(strBuffer, sizeof(strBuffer), format, messageAsHex);
+    snprintf(strBuffer, sizeof(strBuffer), format.c_str(), messageAsHex);
     m_shell->println(strBuffer);
 }
 
@@ -645,7 +608,9 @@ void updateSettings(){
       m_remote_addr[0],
       m_remote_addr[1],
       m_remote_addr[2],
+      #if ORS_ASSET_TRACKER
       m_is_gps_on ? 1 : 0,
+      #endif
       m_block_alarm ? 1 : 0
      );
 
@@ -653,10 +618,11 @@ void updateSettings(){
 }
 
 void publishUpdate(){
-    if (Particle.connected()) {
-        m_last_published = millis();
-        Particle.publish("state-update", m_current, PRIVATE);
-    }
+    // TODO
+    //if (Particle.connected()) {
+    //    m_last_published = millis();
+    //    Particle.publish("state-update", m_current, PRIVATE);
+    //}
 }
 
 void writeMessageToCloudVar(uint8_t *message, int length){
@@ -687,7 +653,7 @@ int set(String command) {
 
     if(name == "Addr") {
         unsigned int a1, a2, a3;
-        sscanf (value,"%02x %02x %02x", &a1, &a2, &a3);
+        sscanf (value.c_str(),"%02x %02x %02x", &a1, &a2, &a3);
         m_remote_addr[0] = a1;
         m_remote_addr[1] = a2;
         m_remote_addr[2] = a3;
