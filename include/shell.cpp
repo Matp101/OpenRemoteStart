@@ -2,7 +2,7 @@
 // BSD 3-Clause License
 
 #include "shell.h"
-#include "Particle.h"
+
 //-------------------------------------------
 // https://gcc.gnu.org/onlinedocs/cpp/Standard-Predefined-Macros.html
 #define COMPILED_TIME __TIME__
@@ -13,7 +13,8 @@ Shell::Shell(char current[], int (*cmd)(String), int (*set)(String)){
 	_current = current;
 	_cmd = cmd;
 	_set = set;
-	 memset(_inBuffer, 0, sizeof(_inBuffer));
+	memset(_inBuffer, 0, sizeof(_inBuffer));
+	Time = MyTime();
 }
 
 bool m_show_prompt = false;
@@ -47,7 +48,7 @@ void Shell::printLinePrefix(){
 void Shell::_handleInput(String s) {
 	Serial.println("");
 	if(s == "version") {
-		Serial.printf("Firmware: %s, Application: %s - %s", System.version().c_str(),
+		Serial.printf("Firmware: %s, Application: %s - %s", 1,//System.version().c_str(),
 		 	COMPILED_DATE, COMPILED_TIME);
 	}
 	#ifdef WiFi
@@ -63,15 +64,15 @@ void Shell::_handleInput(String s) {
 	}
 	#endif
 	else if(s=="dfu"){
-		Serial.print("Entering DFU mode");
+		Serial.print("DFU mode not supported on this board");
 		Serial.flush();
-		System.dfu();
+		//System.dfu();
 	} else if(s=="prompt"){
         m_show_prompt = !m_show_prompt;
     } else if(s == "safemode"){
-		Serial.print("Entering safe mode");
+		Serial.print("Safe mode not supported on this board");
 		Serial.flush();
-		System.enterSafeMode();
+		//System.enterSafeMode();
 	} else if(s == "configure"){
 		#ifdef WiFi
 		WiFi.listen();
@@ -79,7 +80,7 @@ void Shell::_handleInput(String s) {
 		Serial.print("Wifi not supported on this board");
 		#endif
 	} else if(s == "reset"){
-		System.reset();
+		ESP.restart();
 	} else if(s == "current"){
 		Serial.print(_current);
 	} else if(s == "time"){

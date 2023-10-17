@@ -5,6 +5,9 @@
 #pragma once
 #include <Arduino.h>
 #include "shell.h"
+#include <EEPROM.h>
+#include "mytime.h"
+
 
 class Shell
 {
@@ -19,6 +22,7 @@ private:
 	int (*_set)(String);
 	void printLinePrefix();
 	bool _midline = false;
+	MyTime Time;
 public:
 	Shell(char current[], int (*cmd)(String s), int (*set)(String s));
 	~Shell();

@@ -24,12 +24,10 @@
 * the license use at your own risk.
 */
 #include <Arduino.h>
-#include "application.h"
 #include "fortin.h"
 #include "shell.h"
 #include "ringbuffer.h"
 #include "fortinprocessor.h"
-#include "Particle.h"
 
 
 // If you need to debug without a cloud connection

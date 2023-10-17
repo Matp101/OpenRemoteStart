@@ -39,3 +39,6 @@ lib/
 
 # This CPP file is auto generated
 openremotestart.cpp
+
+.pio
+.vscode
