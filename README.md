@@ -1,8 +1,9 @@
 # Open Remote Start
 
-A Particle project for interfacing with fortin remote starter and car alarm systems
+A ESP32 project for interfacing with fortin remote starter and car alarm systems
 via the antenna data-link interface.
 
+It will connect to your home wifi and be interfaced by MQTT.
 
 ## Why
 
@@ -41,10 +42,10 @@ If you want to add a gps/accelerometer to your set up.
 ## How to connect to Fortin Evo-One
 
 This image shows the pinout of the data-link port on the Fortin Evo-One
-![Data-link port](images/Labeled_DataLink.jpg)
+![Data-link port](res/Labeled_DataLink.jpg)
 
 This schematic for using electron with ORS
-![Schematic For ORS with electron](images/Schematic.png)
+![Schematic For ORS with electron](res/Schematic.png)
 
 
 ## A note on licensing

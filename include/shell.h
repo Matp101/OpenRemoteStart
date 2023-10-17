@@ -3,9 +3,9 @@
 
 
 #pragma once
+#include <Arduino.h>
 #include "shell.h"
-#include "application.h"
-#include "Particle.h"
+
 class Shell
 {
 protected:

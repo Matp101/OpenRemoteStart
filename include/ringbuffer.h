@@ -2,6 +2,7 @@
 // BSD 3-Clause License
 
 #pragma once
+#include <Arduino.h>
 #include <stdint.h>
 #include <string.h>
 

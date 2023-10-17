@@ -2,6 +2,7 @@
 // BSD 3-Clause License
 
 #pragma once
+#include <Arduino.h>
 
 /*
  * These are the command types which can originate
