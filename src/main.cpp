@@ -42,13 +42,19 @@
 // If in doubt comment out.
 #define ORS_DANGER_ZONE
 
-#define RemoteUart    Serial1
-#define StarterUart   Serial2
+#define HardwareSerialEnable
+#ifdef HardwareSerialEnable
+    HardwareSerial RemoteSerial(1);
+    HardwareSerial StarterSerial(2);
+#else
+    #define RemoteUart    Serial1
+    #define StarterUart   Serial2
+#endif
 #define RemoteSerialRX  27
 #define RemoteSerialTX  26
 #define StarterSerialRX 16
 #define StarterSerialTX 17
-#define WiFi
+
 #define ORS_MS_BETWEEN_STATUS_PUBLISH 15000
 //#define ORS_MS_BETWEEN_STATUS_PUBLISH 600000
 
@@ -206,29 +212,79 @@ int m_satellite_count = 0;
 // Our usbuart shell for test/debug
 Shell *m_shell = new Shell(m_current, carCommand, set);
 
+// Wifi name and password
+const char *ssid = "ssid";
+const char *password = "password";
+const char *hostname = "ors";
+
+WiFiClient wifiClient;
+PubSubClient mqttClient(wifiClient);
+
+// Mqtt server info
+IPAddress ip(192, 168, 1, 100);
+uint16_t port = 1883;
+const char *user = "user";
+const char *pass = "pass";
+
+// The topic we will be publishing to
+String mqtt_topic = "ors/";
+String mqtt_status = "status";
+// Debug messages, mqtt message received
+String mqtt_received = "received";
+// Send commands to the car
+String mqtt_car_command = "car";
+String mqtt_car_set = "set";
+// Variables
+String mqtt_rx = "rx";
+String mqtt_current = "current";
+String mqtt_settings = "settings";
+String mqtt_devhandler = "devhandler";
+String mqtt_invMsg = "invMsg";
+
+unsigned long lastWifiReconnectAttempt = 0;
+unsigned long lastMqttReconnectAttempt = 0;
+const long wifiReconnectIntervalStart = 5000; // 5 seconds
+const long mqttReconnectIntervalStart = 5000; // 5 seconds
+const long maxReconnectInterval = 60000; // Max interval is 60 seconds
+long wifiReconnectInterval = wifiReconnectIntervalStart;
+long mqttReconnectInterval = mqttReconnectIntervalStart;
 
 
 void setup() {
+    Serial.begin(115200);
+    Serial.println("Starting ORS");
+
     m_last_status_request = millis() - m_status_period;
     m_last_rx[0] = 0;
     m_current[0] = 0;
-    m_settings[0] = 0;
-    // TODO
-    //Particle.function("car", carCommand);
-    //Particle.function("set", set);
-    //Particle.variable("rx", m_last_rx, STRING);
-    //Particle.variable("current", m_current, STRING);
-    //Particle.variable("settings", m_current, STRING);
-    //Particle.variable("devhandler", m_devhandler, STRING);
-    //Particle.variable("invMsg", &m_invalid_msg_count, INT);
-    Serial.begin(115200);
+    m_settings[0] = 0;    
+
+    WiFi.disconnect(true);
+    delay(500);
+
+    WiFi.mode(WIFI_STA);
+    WiFi.config(INADDR_NONE, INADDR_NONE, INADDR_NONE);
+    WiFi.setHostname(hostname);
+    WiFi.begin(ssid, password);
+
+    mqttClient.setClient(wifiClient);
+    mqttClient.setCallback(mqttCallback);
+    mqttClient.setServer(ip, port);
+
+    mqttClient.subscribe((mqtt_topic + mqtt_car_command).c_str());
+    mqttClient.subscribe((mqtt_topic + mqtt_car_set).c_str());
+    
 
     #ifdef RemoteUart
     RemoteUart.begin(9600);
+    #else
+    RemoteSerial.begin(9600, SERIAL_8N1, RemoteSerialRX, RemoteSerialTX);
     #endif
 
     #ifdef StarterUart
     StarterUart.begin(9600);
+    #else
+    StarterSerial.begin(9600, SERIAL_8N1, StarterSerialRX, StarterSerialTX);
     #endif
 
     #ifdef ORS_ASSET_TRACKER
@@ -281,6 +337,31 @@ void loop() {
     }
     #endif
 
+    // WiFi reconnection strategy
+    if (WiFi.status() != WL_CONNECTED && millis() - lastWifiReconnectAttempt > wifiReconnectInterval) {
+        lastWifiReconnectAttempt = millis();
+        if (WiFi.begin(ssid, password) == WL_CONNECTED) {
+            wifiReconnectInterval = wifiReconnectIntervalStart; // Reset to 5 seconds on successful connect
+        } else {
+            wifiReconnectInterval = min(2 * wifiReconnectInterval, maxReconnectInterval); // Double the time before next attempt, but don't exceed max
+        }
+    }
+
+    // MQTT reconnection strategy (only if WiFi is connected)
+    if (WiFi.status() == WL_CONNECTED && !mqttClient.connected() && millis() - lastMqttReconnectAttempt > mqttReconnectInterval) {
+        lastMqttReconnectAttempt = millis();
+        if (mqttClient.connect(getUniqueClientID().c_str(), user, pass, (mqtt_topic + mqtt_status).c_str(), 0, true, "offline")) {
+            mqttReconnectInterval = mqttReconnectIntervalStart; // Reset to 5 seconds on successful connect
+            mqttClient.publish((mqtt_topic + mqtt_status).c_str(), "online");
+            mqttClient.subscribe((mqtt_topic + mqtt_car_command).c_str());
+            mqttClient.subscribe((mqtt_topic + mqtt_car_set).c_str());
+        } else {
+            mqttReconnectInterval = min(2 * mqttReconnectInterval, maxReconnectInterval); // Double the time before next attempt, but don't exceed max
+        }
+    }
+
+    mqttClient.loop();
+
     #ifdef ORS_ASSET_TRACKER
     // If the engine is off and the gps has been on for a while
     // shut it down.
@@ -302,6 +383,15 @@ void loop() {
         m_satellite_count = tracker.getSatellites();
     }
     #endif
+}
+
+String getUniqueClientID() {
+    uint8_t baseMac[6];
+    // Get MAC address for WiFi station
+    esp_read_mac(baseMac, ESP_MAC_WIFI_STA);
+    char macStr[18] = { 0 };
+    snprintf(macStr, sizeof(macStr), "ESP32-%02X%02X%02X%02X%02X%02X", baseMac[0], baseMac[1], baseMac[2], baseMac[3], baseMac[4], baseMac[5]);
+    return String(macStr);
 }
 
 void printMessage(String format, uint8_t message[], int messageLength){
@@ -618,11 +708,15 @@ void updateSettings(){
 }
 
 void publishUpdate(){
-    // TODO
-    //if (Particle.connected()) {
-    //    m_last_published = millis();
-    //    Particle.publish("state-update", m_current, PRIVATE);
-    //}
+    if (mqttClient.connected()) {
+        m_last_published = millis();
+        mqttClient.publish((mqtt_topic + mqtt_rx).c_str(), m_last_rx);
+        mqttClient.publish((mqtt_topic + mqtt_current).c_str(), m_current);
+        mqttClient.publish((mqtt_topic + mqtt_settings).c_str(), m_settings);
+        mqttClient.publish((mqtt_topic + mqtt_devhandler).c_str(), m_devhandler);
+        mqttClient.publish((mqtt_topic + mqtt_invMsg).c_str(), String(m_invalid_msg_count).c_str());
+
+    }
 }
 
 void writeMessageToCloudVar(uint8_t *message, int length){
@@ -784,6 +878,19 @@ int sendCommand(uint8_t cmd, uint8_t payload[], uint8_t payloadLength){
             break;
     }
     return 0;
+}
+
+//callback for mqtt
+void mqttCallback(char* topic, byte* payload, unsigned int length) {
+    if(length > 0){
+
+        String message = "";
+        for (unsigned int i = 0; i < length; i++) {
+            message += (char)payload[i];
+        }
+        m_shell->println(message.c_str());
+        mqttClient.publish((mqtt_topic + mqtt_received).c_str(), message.c_str(), true);
+    }
 }
 
 /*
