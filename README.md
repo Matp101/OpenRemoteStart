@@ -3,7 +3,8 @@
 A ESP32 project for interfacing with fortin remote starter and car alarm systems
 via the antenna data-link interface.
 
-It will connect to your home wifi and be interfaced by MQTT.
+It will connect to your home wifi and be interfaced by MQTT. This way it allows users
+to connect their car to things such as Home Assistant. 
 
 ## Why
 
@@ -35,9 +36,6 @@ both directions.
 will need some way to provide a 5v reference to your level shifter. DO NOT use this to
 power the photon from the data-link 12v-14v source. If you need to power a photon you
 should use a buck down DC->DC power supply, or other USB power source.
-
-[Particle Asset Tracker](https://store.particle.io/products/asset-tracker-v2-components)
-If you want to add a gps/accelerometer to your set up.
 
 ## How to connect to Fortin Evo-One
 
